@@ -390,14 +390,22 @@ class GameScene extends Phaser.Scene {
   }
 
   maybeSpawnPowerup(x, y) {
-    // 22% chance to drop a powerup from a destroyed enemy
-    if (Math.random() > 0.22) return;
+    // Maximum 3 uncollected powerups on screen at once
+    var activeCount = this.powerups.getChildren().filter(function (p) { return p.active; }).length;
+    if (activeCount >= 3) return;
+
+    // Reduced drop rate (8.5% chance) so screen doesn't get cluttered
+    if (Math.random() > 0.085) return;
+
+    // Cooldown of 2.5s between drops to prevent simultaneous clusters
+    if (this.time.now < (this.nextPowerupDropTime || 0)) return;
+    this.nextPowerupDropTime = this.time.now + 2500;
 
     var types = [
       { type: 'shadow', weight: 35 },
       { type: 'triple', weight: 35 },
       { type: 'shield', weight: 22 },
-      { type: 'bomb', weight: 8 } // Low probability as requested
+      { type: 'bomb', weight: 8 } // Rare
     ];
     var picked = weightedPick(types, (t) => t.weight).type;
 
