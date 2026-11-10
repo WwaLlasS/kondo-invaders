@@ -14,6 +14,14 @@ var ENEMY_LAUNCH = 'launch';
 var ENEMY_DIVE = 'dive';
 var ENEMY_RETURN = 'return';
 
+// Parallax background planet definitions (speed, depth, alpha, horizontal response)
+var PLANET_DEFS = [
+  { key: 'planet-moon', speedY: 0.35, depth: -9, alpha: 0.8, scale: 1.0, parallaxX: 0.02 },
+  { key: 'planet-ice', speedY: 0.65, depth: -8, alpha: 0.9, scale: 1.0, parallaxX: 0.05 },
+  { key: 'planet-desert', speedY: 0.95, depth: -7, alpha: 0.95, scale: 1.0, parallaxX: 0.08 },
+  { key: 'planet-gas', speedY: 1.35, depth: -6, alpha: 1.0, scale: 1.0, parallaxX: 0.12 }
+];
+
 class GameScene extends Phaser.Scene {
   constructor() {
     super('game');
@@ -34,13 +42,15 @@ class GameScene extends Phaser.Scene {
     this.waveCleared = false;
     this.gameOver = false;
 
-    this.starfield = this.add.tileSprite(0, 0, GAME_W, GAME_H, 'starfield').setOrigin(0);
+    this.starfield = this.add.tileSprite(0, 0, GAME_W, GAME_H, 'starfield').setOrigin(0).setDepth(-10);
+    this.initPlanets();
 
     this.sfx = {
       laserPlayer: addSound(this, 'laser-player', { volume: 0.8 }),
       laserEnemy: addSound(this, 'laser-enemy', { volume: 0.7 }),
       explosionPlayer: addSound(this, 'explosion-player', { volume: 0.8 }),
       explosionEnemy: addSound(this, 'explosion-enemy', { volume: 0.3 }),
+      armorHit: addSound(this, 'explosion-enemy', { volume: 0.2, rate: 2 }),
       dive: addSound(this, 'laser-enemy', { volume: 0.5, rate: 0.5 })
     };
     Music.play();
@@ -109,11 +119,13 @@ class GameScene extends Phaser.Scene {
   // one after another and settle into their slots.
   createEnemies() {
     var formation = Formations.generate(GAME_W / 2, HUD_H + 50);
-    var slots = Phaser.Utils.Array.Shuffle(formation.slots);
+    var slots = Phaser.Utils.Array.Shuffle(assignEnemyTypes(formation.slots, this.wave));
 
     slots.forEach((slot, i) => {
-      var alien = this.enemies.create(Phaser.Math.Between(30, GAME_W - 30), HUD_H - 30 - i * 14, 'enemy', 0);
-      alien.play('enemy-dive');
+      var alien = this.enemies.create(Phaser.Math.Between(30, GAME_W - 30), HUD_H - 30 - i * 14, slot.kind.key, 0);
+      alien.kind = slot.kind;
+      alien.hp = slot.kind.hp;
+      alien.play(slot.kind.key + '-dive');
       // Generous box (covers the sprite at any rotation); HitMask is exact.
       alien.body.setSize(46, 46, true);
       alien.body.moves = false; // positions are driven by code, not physics
@@ -160,8 +172,69 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(1500, () => this.waveText.setVisible(false));
   }
 
+  initPlanets() {
+    this.planets = [];
+    // Spawn 2 planets already on screen at varied positions, and 2 waiting above
+    var initial = [
+      { defIndex: 0, x: GAME_W * 0.78, y: GAME_H * 0.28 },
+      { defIndex: 1, x: GAME_W * 0.22, y: GAME_H * 0.68 },
+      { defIndex: 2, x: GAME_W * 0.65, y: -120 },
+      { defIndex: 3, x: GAME_W * 0.3, y: -380 }
+    ];
+
+    initial.forEach((init) => {
+      var def = PLANET_DEFS[init.defIndex];
+      var sprite = this.add.image(init.x, init.y, def.key)
+        .setDepth(def.depth)
+        .setAlpha(def.alpha)
+        .setScale(def.scale);
+      sprite.speedY = def.speedY;
+      sprite.parallaxX = def.parallaxX;
+      sprite.defIndex = init.defIndex;
+      this.planets.push(sprite);
+    });
+  }
+
+  updateBackground(delta) {
+    var dt = delta / 16.67;
+    var playerVx = (this.player && this.player.body) ? this.player.body.velocity.x : 0;
+    var vxRatio = playerVx / PLAYER_SPEED; // -1 to 1
+
+    // Starfield: continuous downward forward motion + subtle horizontal parallax
+    this.starfield.tilePositionY -= 2 * dt;
+    this.starfield.tilePositionX += vxRatio * 0.35 * dt;
+
+    this.planets.forEach((p) => {
+      // Forward parallax: downward drift
+      p.y += p.speedY * dt;
+      // Horizontal parallax: shift opposite to ship steering
+      p.x -= vxRatio * p.parallaxX * 24 * dt;
+
+      // Wrap around gently if shifted offscreen horizontally
+      if (p.x < -60) p.x = GAME_W + 60;
+      else if (p.x > GAME_W + 60) p.x = -60;
+
+      // Reset when scrolled past bottom
+      if (p.y > GAME_H + 120) {
+        p.y = -100 - Math.random() * 250;
+        p.x = Phaser.Math.Between(40, GAME_W - 40);
+
+        // Cycle through planet types with varied depth and speed
+        var nextIdx = (p.defIndex + 1 + Phaser.Math.Between(0, 1)) % PLANET_DEFS.length;
+        var def = PLANET_DEFS[nextIdx];
+        p.defIndex = nextIdx;
+        p.setTexture(def.key);
+        p.setDepth(def.depth);
+        p.setAlpha(def.alpha);
+        p.setScale(def.scale);
+        p.speedY = def.speedY;
+        p.parallaxX = def.parallaxX;
+      }
+    });
+  }
+
   update(time, delta) {
-    this.starfield.tilePositionY -= 2 * (delta / 16.67);
+    this.updateBackground(delta);
     if (this.gameOver) return;
 
     // Move the aliens first so the frame the last one settles in its slot
@@ -302,7 +375,7 @@ class GameScene extends Phaser.Scene {
     if (ready && this.nextDive === 0) this.nextDive = time + 2500;
     if (ready && time > this.nextDive && diving < maxDivers && this.player.body.enable) {
       var candidates = active.filter(function (e) { return e.enemyState === ENEMY_FORMATION; });
-      if (candidates.length > 0) this.launchDiver(Phaser.Utils.Array.GetRandom(candidates));
+      if (candidates.length > 0) this.launchDiver(weightedPick(candidates, (e) => e.kind.diveWeight));
       var minDelay = Math.max(2200 - this.wave * 200, 700);
       this.nextDive = time + Phaser.Math.Between(minDelay, minDelay * 2);
     }
@@ -320,7 +393,7 @@ class GameScene extends Phaser.Scene {
     // Randomized flight so no two dives look the same.
     enemy.dive = {
       t: 0,
-      vy: Phaser.Math.Between(170, 230) + this.wave * 12,
+      vy: (Phaser.Math.Between(170, 230) + this.wave * 12) * enemy.kind.diveSpeed,
       maxVx: Phaser.Math.Between(140, 260),
       homing: Phaser.Math.FloatBetween(0.8, 2.5),
       swayAmp: Phaser.Math.Between(20, 110),
@@ -332,8 +405,8 @@ class GameScene extends Phaser.Scene {
     // Take-off animation: hop up, flash, and spin in a random direction.
     var spin = Phaser.Math.RND.sign() * 360;
     enemy.setTintFill(0xffffff);
-    this.time.delayedCall(80, () => { if (enemy.active) enemy.clearTint(); });
-    enemy.play('enemy-dive');
+    this.time.delayedCall(80, () => { if (enemy.active) this.showDamage(enemy); });
+    enemy.play(enemy.kind.key + '-dive');
     this.tweens.add({
       targets: enemy,
       y: enemy.y - 24,
@@ -383,7 +456,7 @@ class GameScene extends Phaser.Scene {
       e.setPosition(tx, ty);
       e.rotation = 0;
       e.enemyState = ENEMY_FORMATION;
-      e.play('enemy-fly');
+      e.play(e.kind.key + '-fly');
     } else {
       e.x += (tx - e.x) / dist * step;
       e.y += (ty - e.y) / dist * step;
@@ -402,7 +475,7 @@ class GameScene extends Phaser.Scene {
     var bullet = this.enemyBullets.get();
     if (!bullet) return;
 
-    var shooter = Phaser.Utils.Array.GetRandom(shooters);
+    var shooter = weightedPick(shooters, (e) => e.kind.fireWeight);
     bullet.enableBody(true, shooter.x, shooter.y + 18, true, true);
     bullet.play('enemy-bullet-spin');
     this.physics.moveToObject(bullet, this.player, Math.min(120 + (this.wave - 1) * 15, 260));
@@ -428,9 +501,22 @@ class GameScene extends Phaser.Scene {
 
   hitEnemy(bullet, enemy) {
     bullet.disableBody(true, true);
+    enemy.hp--;
+    if (enemy.hp > 0) {
+      // Armored enemy survived: flash white, then stay tinted as damaged.
+      this.sfx.armorHit.play();
+      enemy.setTintFill(0xffffff);
+      this.time.delayedCall(60, () => { if (enemy.active) this.showDamage(enemy); });
+      return;
+    }
     // Shooting down a diver is worth double.
-    this.updateScore(enemy.enemyState === ENEMY_FORMATION ? 20 : 40);
+    this.updateScore(enemy.kind.points * (enemy.enemyState === ENEMY_FORMATION ? 1 : 2));
     this.explodeEnemy(enemy);
+  }
+
+  showDamage(enemy) {
+    if (enemy.hp < enemy.kind.hp) enemy.setTint(0xff8a80);
+    else enemy.clearTint();
   }
 
   explodeEnemy(enemy) {

@@ -24,9 +24,18 @@ class PreloadScene extends Phaser.Scene {
     this.load.image('btn-highscore', 'img/btn-highscore.png');
     this.load.image('ship', 'img/ship.png');
 
+    // Parallax background planets
+    this.load.image('planet-gas', 'img/planet-gas.png');
+    this.load.image('planet-desert', 'img/planet-desert.png');
+    this.load.image('planet-ice', 'img/planet-ice.png');
+    this.load.image('planet-moon', 'img/planet-moon.png');
+
     this.load.spritesheet('bullet', 'img/balas/balas_1.png', { frameWidth: 15, frameHeight: 15 });
     this.load.spritesheet('enemy-bullet', 'img/balas/balas_4.png', { frameWidth: 15, frameHeight: 15 });
     this.load.spritesheet('enemy', 'img/invader.png', { frameWidth: 45, frameHeight: 36 });
+    this.load.spritesheet('enemy-scout', 'img/enemy-scout.png', { frameWidth: 45, frameHeight: 36 });
+    this.load.spritesheet('enemy-elite', 'img/enemy-elite.png', { frameWidth: 45, frameHeight: 36 });
+    this.load.spritesheet('enemy-tank', 'img/enemy-tank.png', { frameWidth: 45, frameHeight: 36 });
     this.load.spritesheet('player', 'img/player.png', { frameWidth: 30, frameHeight: 15 });
 
     this.load.audio('laser-player', 'sound/laser4.wav');
@@ -39,18 +48,20 @@ class PreloadScene extends Phaser.Scene {
     // The painted menu background looks better smoothed; the sprites stay pixelated.
     this.textures.get('menu-bg').setFilter(Phaser.Textures.FilterMode.LINEAR);
 
-    this.anims.create({
-      key: 'enemy-fly',
-      frames: this.anims.generateFrameNumbers('enemy', { frames: [0, 1] }),
-      frameRate: 2,
-      repeat: -1
-    });
-    // Faster wing flapping while an alien dives at the player.
-    this.anims.create({
-      key: 'enemy-dive',
-      frames: this.anims.generateFrameNumbers('enemy', { frames: [0, 1] }),
-      frameRate: 10,
-      repeat: -1
+    // Every enemy kind: slow wing flapping in formation, faster while diving.
+    ENEMY_SHEETS.forEach((key) => {
+      this.anims.create({
+        key: key + '-fly',
+        frames: this.anims.generateFrameNumbers(key, { frames: [0, 1] }),
+        frameRate: 2,
+        repeat: -1
+      });
+      this.anims.create({
+        key: key + '-dive',
+        frames: this.anims.generateFrameNumbers(key, { frames: [0, 1] }),
+        frameRate: 10,
+        repeat: -1
+      });
     });
     this.anims.create({
       key: 'player-explode',
@@ -70,7 +81,7 @@ class PreloadScene extends Phaser.Scene {
       repeat: -1
     });
 
-    HitMask.build(this, ['player', 'enemy', 'bullet', 'enemy-bullet']);
+    HitMask.build(this, ['player', 'bullet', 'enemy-bullet'].concat(ENEMY_SHEETS));
 
     this.sound.mute = settings.muted;
     this.scene.start('menu');

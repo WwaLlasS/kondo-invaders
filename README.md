@@ -34,13 +34,33 @@ js/config.js          tamaño lógico, ajustes, helpers
 js/main.js            arranque de Phaser, ajuste de alto, errores
 js/scenes/            escenas: preload, menu, game, pause, gameover, highscores
 js/formations.js      formaciones aleatorias de enemigos por oleada
+js/enemies.js         tipos de enemigos y mezcla por oleada
 js/collision.js       colisiones precisas por píxel
 js/tilt.js            control por inclinación
 js/music.js           música en streaming
 js/scores.js          tabla de récords (localStorage)
 lib/phaser.min.js     Phaser 3.90.0
 assets/               imágenes, sonidos e iconos
+tools/                generador de sprites de enemigos (Python, sin dependencias)
 ```
+
+## Enemigos
+
+| Tipo | Sprite | Vida | Puntos | Comportamiento |
+|---|---|---|---|---|
+| Invasor | `invader.png` | 1 | 20 | Base |
+| Explorador | `enemy-scout.png` | 1 | 30 | Se lanza en picada seguido y rápido, dispara poco |
+| Élite | `enemy-elite.png` | 1 | 40 | Dispara más que los demás |
+| Blindado | `enemy-tank.png` | 2 | 60 | Resiste un disparo, baja lento |
+
+Derribar a un enemigo en picada vale el doble. Los exploradores aparecen desde
+la oleada 1, los élite desde la 2 y los blindados desde la 3.
+
+Los sprites nuevos se generan con `python3 tools/make_sprites.py`. Cada hoja
+mide 135×36: tres cuadros de 45×36 (pose A, pose B y explosión). Para agregar
+un enemigo hecho a mano basta con poner su hoja en `assets/img/`, cargarla en
+`js/scenes/preload.js`, añadir su clave a `ENEMY_SHEETS` y definir el tipo en
+`js/enemies.js`.
 
 ## Publicación
 
