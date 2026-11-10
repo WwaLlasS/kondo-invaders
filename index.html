@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="author" content="KondoSoft" />
+    <meta name="description" content="Kondo Invaders - a retro shoot 'em up for mobile and desktop." />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; media-src 'self' data: blob:; img-src 'self' data: blob:" />
+
+    <title>Kondo Invaders</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="assets/icons/favicon.png" />
+    <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
+    <link rel="preload" href="css/pressstart2p-regular-webfont.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="css/style.css?v=3.0" />
+  </head>
+
+  <body>
+    <main id="game" aria-label="Kondo Invaders game"></main>
+
+    <div id="name-entry" class="overlay" hidden>
+      <form class="panel" autocomplete="off">
+        <label for="player-name">ENTER YOUR NAME</label>
+        <input id="player-name" name="name" type="text" maxlength="10" spellcheck="false"
+               autocapitalize="characters" autocorrect="off" enterkeyhint="done" placeholder="PLAYER" />
+        <button type="submit">OK</button>
+      </form>
+    </div>
+
+    <div id="error" class="overlay" role="alert" hidden>
+      <div class="panel">
+        <span>SOMETHING WENT WRONG</span>
+        <small class="error-message"></small>
+        <button type="button">RELOAD</button>
+      </div>
+    </div>
+
+    <div id="rotate" class="overlay" aria-hidden="true">
+      <div class="panel">PLEASE ROTATE YOUR DEVICE TO PORTRAIT</div>
+    </div>
+
+    <script src="lib/phaser.min.js?v=3.0"></script>
+    <script src="js/config.js?v=3.0"></script>
+    <script src="js/scores.js?v=3.0"></script>
+    <script src="js/tilt.js?v=3.0"></script>
+    <script src="js/music.js?v=3.0"></script>
+    <script src="js/collision.js?v=3.0"></script>
+    <script src="js/formations.js?v=3.0"></script>
+    <script src="js/scenes/preload.js?v=3.0"></script>
+    <script src="js/scenes/menu.js?v=3.0"></script>
+    <script src="js/scenes/game.js?v=3.0"></script>
+    <script src="js/scenes/pause.js?v=3.0"></script>
+    <script src="js/scenes/gameover.js?v=3.0"></script>
+    <script src="js/scenes/highscores.js?v=3.0"></script>
+    <script src="js/main.js?v=3.0"></script>
+  </body>
+</html>

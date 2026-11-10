@@ -1,0 +1,154 @@
+@font-face {
+  font-family: 'Press Start 2P';
+  src: url('pressstart2p-regular-webfont.woff2') format('woff2'),
+       url('pressstart2p-regular-webfont.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: block;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #05050f radial-gradient(ellipse at center, #141433 0%, #05050f 70%) fixed;
+  color: #fff;
+  font-family: 'Press Start 2P', monospace;
+}
+
+body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+}
+
+/* Game area fills the screen minus notches / home indicator. Phaser scales
+   the canvas to fit inside it, keeping the aspect ratio. */
+#game {
+  position: fixed;
+  top: env(safe-area-inset-top, 0);
+  right: env(safe-area-inset-right, 0);
+  bottom: env(safe-area-inset-bottom, 0);
+  left: env(safe-area-inset-left, 0);
+  touch-action: none;
+}
+
+#game canvas {
+  display: block;
+  touch-action: none;
+  box-shadow: 0 0 60px rgba(80, 80, 255, 0.25);
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: min(100%, 360px);
+  padding: 28px 20px;
+  border: 4px solid #fff;
+  background: #000;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+#name-entry label {
+  color: #ffeb3b;
+}
+
+#name-entry input,
+#name-entry button {
+  font: inherit;
+  font-size: 16px; /* 16px+ stops iOS from zooming into the field */
+  color: #fff;
+  background: #000;
+  border: 3px solid #fff;
+  border-radius: 0;
+  padding: 12px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+#name-entry input {
+  width: 100%;
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+#name-entry input:focus {
+  border-color: #ffeb3b;
+}
+
+#name-entry button {
+  min-width: 120px;
+  cursor: pointer;
+}
+
+#name-entry button:hover,
+#name-entry button:focus-visible {
+  color: #000;
+  background: #ffeb3b;
+  border-color: #ffeb3b;
+}
+
+#error {
+  z-index: 20;
+}
+
+#error .error-message {
+  max-width: 100%;
+  font-size: 10px;
+  color: #aaa;
+  overflow-wrap: anywhere;
+}
+
+#error button {
+  font: inherit;
+  color: #000;
+  background: #ffeb3b;
+  border: 0;
+  padding: 12px 20px;
+  cursor: pointer;
+}
+
+/* The game is portrait-only: ask phones held sideways to rotate. */
+#rotate {
+  display: none;
+}
+
+@media (orientation: landscape) and (pointer: coarse) and (max-height: 540px) {
+  #rotate {
+    display: flex;
+    background: #000;
+  }
+}
