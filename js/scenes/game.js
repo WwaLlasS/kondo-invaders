@@ -418,7 +418,7 @@ class GameScene extends Phaser.Scene {
     var p = this.powerups.create(x, y, 'powerup-' + picked);
     if (!p) return;
     p.powerupType = picked;
-    p.setVelocityY(65);
+    p.setVelocityY(120);
     p.setDepth(2);
     p.baseX = x;
     p.spawnTime = this.time.now;
@@ -528,7 +528,7 @@ class GameScene extends Phaser.Scene {
     // Falling animation for powerups
     this.powerups.getChildren().forEach(function (p) {
       if (p.active) {
-        p.x = p.baseX + Math.sin((time - p.spawnTime) * 0.005) * 16;
+        p.x = p.baseX + Math.sin((time - p.spawnTime) * 0.007) * 18;
         if (p.y > GAME_H + 30) p.destroy();
       }
     });
