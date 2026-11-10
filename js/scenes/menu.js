@@ -55,7 +55,7 @@ class MenuScene extends Phaser.Scene {
     // and by every browser to enter fullscreen.
     Tilt.requestPermission();
     Fullscreen.enter();
-    this.scene.start('game');
+    this.scene.start('shipselect');
   }
 
   showScores() {

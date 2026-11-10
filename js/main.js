@@ -17,7 +17,7 @@ function startGame() {
     input: {
       activePointers: 2
     },
-    scene: [PreloadScene, MenuScene, GameScene, PauseScene, GameOverScene, HighScoresScene]
+    scene: [PreloadScene, MenuScene, ShipSelectScene, GameScene, PauseScene, GameOverScene, HighScoresScene]
   });
 
   // An exception inside a frame would otherwise stop Phaser's loop for good.

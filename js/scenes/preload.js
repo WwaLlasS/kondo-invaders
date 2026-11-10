@@ -30,13 +30,32 @@ class PreloadScene extends Phaser.Scene {
     this.load.image('planet-ice', 'img/planet-ice.png');
     this.load.image('planet-moon', 'img/planet-moon.png');
 
+    // Extra ship HUD icons
+    this.load.image('ship-swift', 'img/ship-swift.png');
+    this.load.image('ship-heavy', 'img/ship-heavy.png');
+
+    // Power-up icons and shield
+    this.load.image('powerup-shadow', 'img/powerup-shadow.png');
+    this.load.image('powerup-triple', 'img/powerup-triple.png');
+    this.load.image('powerup-shield', 'img/powerup-shield.png');
+    this.load.image('powerup-bomb', 'img/powerup-bomb.png');
+    this.load.image('shield-bubble', 'img/shield-bubble.png');
+    this.load.image('player-shadow', 'img/player-shadow.png');
+
     this.load.spritesheet('bullet', 'img/balas/balas_1.png', { frameWidth: 15, frameHeight: 15 });
     this.load.spritesheet('enemy-bullet', 'img/balas/balas_4.png', { frameWidth: 15, frameHeight: 15 });
+    this.load.spritesheet('enemy-bullet-scout', 'img/enemy-bullet-scout.png', { frameWidth: 15, frameHeight: 15 });
+    this.load.spritesheet('enemy-bullet-tank', 'img/enemy-bullet-tank.png', { frameWidth: 15, frameHeight: 15 });
+    this.load.spritesheet('enemy-bullet-elite', 'img/enemy-bullet-elite.png', { frameWidth: 15, frameHeight: 15 });
+
     this.load.spritesheet('enemy', 'img/invader.png', { frameWidth: 45, frameHeight: 36 });
     this.load.spritesheet('enemy-scout', 'img/enemy-scout.png', { frameWidth: 45, frameHeight: 36 });
     this.load.spritesheet('enemy-elite', 'img/enemy-elite.png', { frameWidth: 45, frameHeight: 36 });
     this.load.spritesheet('enemy-tank', 'img/enemy-tank.png', { frameWidth: 45, frameHeight: 36 });
+
     this.load.spritesheet('player', 'img/player.png', { frameWidth: 30, frameHeight: 15 });
+    this.load.spritesheet('player-swift', 'img/player-swift.png', { frameWidth: 30, frameHeight: 15 });
+    this.load.spritesheet('player-heavy', 'img/player-heavy.png', { frameWidth: 30, frameHeight: 15 });
 
     this.load.audio('laser-player', 'sound/laser4.wav');
     this.load.audio('laser-enemy', 'sound/laser5.wav');
@@ -63,27 +82,38 @@ class PreloadScene extends Phaser.Scene {
         repeat: -1
       });
     });
-    this.anims.create({
-      key: 'player-explode',
-      frames: this.anims.generateFrameNumbers('player', { frames: [1, 2] }),
-      frameRate: 10
+
+    ['player', 'player-swift', 'player-heavy'].forEach((pKey) => {
+      this.anims.create({
+        key: pKey + '-explode',
+        frames: this.anims.generateFrameNumbers(pKey, { frames: [1, 2] }),
+        frameRate: 10
+      });
     });
+
     this.anims.create({
       key: 'bullet-spin',
       frames: this.anims.generateFrameNumbers('bullet', { start: 0, end: 2 }),
       frameRate: 12,
       repeat: -1
     });
-    this.anims.create({
-      key: 'enemy-bullet-spin',
-      frames: this.anims.generateFrameNumbers('enemy-bullet', { start: 0, end: 2 }),
-      frameRate: 12,
-      repeat: -1
+
+    ['enemy-bullet', 'enemy-bullet-scout', 'enemy-bullet-tank', 'enemy-bullet-elite'].forEach((bKey) => {
+      this.anims.create({
+        key: bKey + '-spin',
+        frames: this.anims.generateFrameNumbers(bKey, { start: 0, end: 2 }),
+        frameRate: 12,
+        repeat: -1
+      });
     });
 
-    HitMask.build(this, ['player', 'bullet', 'enemy-bullet'].concat(ENEMY_SHEETS));
+    HitMask.build(this, [
+      'player', 'player-swift', 'player-heavy',
+      'bullet', 'enemy-bullet', 'enemy-bullet-scout', 'enemy-bullet-tank', 'enemy-bullet-elite'
+    ].concat(ENEMY_SHEETS));
 
     this.sound.mute = settings.muted;
-    this.scene.start('menu');
+    var target = new URLSearchParams(window.location.search).get('scene') || 'menu';
+    this.scene.start(target);
   }
 }

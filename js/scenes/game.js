@@ -27,12 +27,21 @@ class GameScene extends Phaser.Scene {
     super('game');
   }
 
+  init(data) {
+    var stored = storage.get('kondo-invaders-selected-ship');
+    this.shipKey = (data && data.shipKey) || stored || DEFAULT_SHIP_KEY;
+    if (!PLAYER_SHIPS[this.shipKey]) this.shipKey = DEFAULT_SHIP_KEY;
+    this.shipConfig = PLAYER_SHIPS[this.shipKey];
+  }
+
   create() {
     setupCamera(this);
     this.physics.world.setBounds(0, HUD_H, GAME_W, GAME_H - HUD_H);
 
     this.score = 0;
-    this.lives = 3;
+    this.lives = this.shipConfig.lives;
+    this.playerSpeed = this.shipConfig.speed;
+    this.playerAutoFireDelay = this.shipConfig.fireDelay;
     this.wave = 1;
     this.nextPlayerShot = 0;
     this.lastPlayerShot = -Infinity;
@@ -41,6 +50,12 @@ class GameScene extends Phaser.Scene {
     this.combatReadyAt = Infinity;
     this.waveCleared = false;
     this.gameOver = false;
+
+    // Power-up states
+    this.activePowerups = { shadow: 0, triple: 0 };
+    this.hasShield = false;
+    this.shieldSprite = null;
+    this.shadowDrone = null;
 
     this.starfield = this.add.tileSprite(0, 0, GAME_W, GAME_H, 'starfield').setOrigin(0).setDepth(-10);
     this.initPlanets();
@@ -55,17 +70,19 @@ class GameScene extends Phaser.Scene {
     };
     Music.play();
 
-    this.bullets = this.physics.add.group({ defaultKey: 'bullet', maxSize: 30 });
-    this.enemyBullets = this.physics.add.group({ defaultKey: 'enemy-bullet', maxSize: 30 });
+    this.bullets = this.physics.add.group({ defaultKey: 'bullet', maxSize: 40 });
+    this.enemyBullets = this.physics.add.group({ defaultKey: 'enemy-bullet', maxSize: 40 });
+    this.powerups = this.physics.add.group();
     this.enemies = this.physics.add.group();
 
-    this.player = this.physics.add.sprite(GAME_W / 2, GAME_H - 80, 'player', 0).setScale(1.5);
+    this.player = this.physics.add.sprite(GAME_W / 2, GAME_H - 80, this.shipConfig.spriteKey, 0).setScale(1.5);
     this.player.setCollideWorldBounds(true);
 
     // Bodies only pre-filter; HitMask decides whether visible pixels touch.
     this.physics.add.overlap(this.bullets, this.enemies, this.hitEnemy, this.bulletHitsEnemy, this);
     this.physics.add.overlap(this.player, this.enemyBullets, this.hitPlayer, this.bulletHitsPlayer, this);
     this.physics.add.overlap(this.player, this.enemies, this.enemyCrash, this.enemyHitsPlayer, this);
+    this.physics.add.overlap(this.player, this.powerups, this.collectPowerup, null, this);
 
     this.createHud();
     onLayout(this, this.relayout);
@@ -101,8 +118,9 @@ class GameScene extends Phaser.Scene {
     this.updateScore(0);
 
     this.lifeIcons = [];
+    var iconStartX = GAME_W - 55 - (this.lives * 28);
     for (var i = 0; i < this.lives; i++) {
-      this.lifeIcons.push(this.add.image(GAME_W - 150 + i * 34, HUD_H / 2, 'ship').setAlpha(0.8).setDepth(HUD_DEPTH));
+      this.lifeIcons.push(this.add.image(iconStartX + i * 28, HUD_H / 2, this.shipConfig.iconKey).setAlpha(0.85).setDepth(HUD_DEPTH));
     }
 
     var pauseBtn = addText(this, GAME_W - 26, HUD_H / 2, 'II', 14).setOrigin(0.5).setPadding(12, 10).setDepth(HUD_DEPTH);
@@ -111,6 +129,9 @@ class GameScene extends Phaser.Scene {
       event.stopPropagation();
       this.pause();
     });
+
+    this.powerupHudText = addText(this, 12, HUD_H + 8, '', 8, '#ffeb3b').setOrigin(0, 0).setDepth(HUD_DEPTH);
+    this.powerupBanner = addText(this, GAME_W / 2, HUD_H + 40, '', 11, '#00e5ff').setOrigin(0.5).setDepth(10).setVisible(false);
 
     this.waveText = addText(this, GAME_W / 2, GAME_H / 2, '', 22).setOrigin(0.5).setDepth(10);
   }
@@ -235,6 +256,7 @@ class GameScene extends Phaser.Scene {
 
   update(time, delta) {
     this.updateBackground(delta);
+    this.updatePowerups(time, delta);
     if (this.gameOver) return;
 
     // Move the aliens first so the frame the last one settles in its slot
@@ -270,27 +292,27 @@ class GameScene extends Phaser.Scene {
     var player = this.player;
     if (!player.active || !player.body.enable) return;
 
+    var speed = this.playerSpeed || PLAYER_SPEED;
     var left = this.cursors.left.isDown || this.keys.A.isDown;
     var right = this.cursors.right.isDown || this.keys.D.isDown;
     var pointer = this.getActivePointer();
     var vx = 0;
 
     if (left) {
-      vx = -PLAYER_SPEED;
+      vx = -speed;
     } else if (right) {
-      vx = PLAYER_SPEED;
+      vx = speed;
     } else if (Tilt.available) {
       // On phones the ship is steered only by tilting; touching just fires.
-      vx = Tilt.velocity(PLAYER_SPEED);
+      vx = Tilt.velocity(speed);
     }
     player.setVelocityX(vx);
 
+    var fireDelay = this.playerAutoFireDelay || PLAYER_AUTO_FIRE_DELAY;
     if ((this.keys.SPACE.isDown || pointer) && time >= this.nextPlayerShot && this.canShoot(time)) {
-      // Schedule from when the shot was due, not from this frame, so frame
-      // rounding doesn't make auto-fire slower than PLAYER_AUTO_FIRE_DELAY.
       var due = time - this.nextPlayerShot < 50 ? this.nextPlayerShot : time;
       this.firePlayerBullet(time);
-      this.nextPlayerShot = due + PLAYER_AUTO_FIRE_DELAY;
+      this.nextPlayerShot = due + fireDelay;
     }
   }
 
@@ -311,14 +333,235 @@ class GameScene extends Phaser.Scene {
   }
 
   firePlayerBullet(time) {
-    var bullet = this.bullets.get();
-    if (!bullet) return;
-    bullet.enableBody(true, this.player.x, this.player.y - 14, true, true);
-    bullet.play('bullet-spin');
-    bullet.setVelocity(0, -500);
+    var isTriple = this.isPowerupActive('triple');
+    var isShadow = this.isPowerupActive('shadow');
+
+    this.spawnPlayerShot(this.player.x, this.player.y - 14, isTriple);
+
+    // Duplicate shot from shadow clone trailing beneath player
+    if (isShadow && this.shadowDrone && this.shadowDrone.visible) {
+      this.spawnPlayerShot(this.shadowDrone.x, this.shadowDrone.y - 10, isTriple);
+    }
+
+    var fireDelay = this.playerAutoFireDelay || PLAYER_AUTO_FIRE_DELAY;
     this.lastPlayerShot = time;
-    this.nextPlayerShot = time + PLAYER_AUTO_FIRE_DELAY;
+    this.nextPlayerShot = time + fireDelay;
     this.sfx.laserPlayer.play();
+  }
+
+  spawnPlayerShot(x, y, isTriple) {
+    if (isTriple) {
+      var bCenter = this.bullets.get();
+      if (bCenter) {
+        bCenter.enableBody(true, x, y, true, true);
+        bCenter.play('bullet-spin');
+        bCenter.setVelocity(0, -520);
+        bCenter.rotation = 0;
+      }
+      var bLeft = this.bullets.get();
+      if (bLeft) {
+        bLeft.enableBody(true, x - 8, y, true, true);
+        bLeft.play('bullet-spin');
+        bLeft.setVelocity(-120, -490);
+        bLeft.rotation = -0.22;
+      }
+      var bRight = this.bullets.get();
+      if (bRight) {
+        bRight.enableBody(true, x + 8, y, true, true);
+        bRight.play('bullet-spin');
+        bRight.setVelocity(120, -490);
+        bRight.rotation = 0.22;
+      }
+    } else {
+      var bullet = this.bullets.get();
+      if (bullet) {
+        bullet.enableBody(true, x, y, true, true);
+        bullet.play('bullet-spin');
+        bullet.setVelocity(0, -500);
+        bullet.rotation = 0;
+      }
+    }
+  }
+
+  // --- Power-up system ----------------------------------------------------
+
+  isPowerupActive(type) {
+    return this.time.now < (this.activePowerups[type] || 0);
+  }
+
+  maybeSpawnPowerup(x, y) {
+    // 22% chance to drop a powerup from a destroyed enemy
+    if (Math.random() > 0.22) return;
+
+    var types = [
+      { type: 'shadow', weight: 35 },
+      { type: 'triple', weight: 35 },
+      { type: 'shield', weight: 22 },
+      { type: 'bomb', weight: 8 } // Low probability as requested
+    ];
+    var picked = weightedPick(types, (t) => t.weight).type;
+
+    var p = this.powerups.create(x, y, 'powerup-' + picked);
+    if (!p) return;
+    p.powerupType = picked;
+    p.setVelocityY(65);
+    p.setDepth(2);
+    p.baseX = x;
+    p.spawnTime = this.time.now;
+  }
+
+  collectPowerup(player, powerup) {
+    if (!powerup.active || !player.active || !player.body.enable) return;
+    var type = powerup.powerupType;
+    powerup.destroy();
+
+    if (type === 'shadow') {
+      this.activePowerups.shadow = this.time.now + 10000;
+      this.showPowerupBanner('SHADOW CLONE (10s)');
+      this.spawnShadowDrone();
+    } else if (type === 'triple') {
+      this.activePowerups.triple = this.time.now + 10000;
+      this.showPowerupBanner('TRIPLE SHOT (10s)');
+    } else if (type === 'shield') {
+      this.hasShield = true;
+      this.showPowerupBanner('ENERGY SHIELD ACTIVE');
+    } else if (type === 'bomb') {
+      this.triggerSmartBomb();
+    }
+  }
+
+  spawnShadowDrone() {
+    if (this.shadowDrone) {
+      this.shadowDrone.destroy();
+      this.shadowDrone = null;
+    }
+    var spriteKey = this.shipConfig ? this.shipConfig.spriteKey : 'player';
+    // Starts small right under the ship, then smoothly grows to the full player size (1.5)
+    this.shadowDrone = this.add.sprite(this.player.x, this.player.y + 4, spriteKey, 0)
+      .setScale(0.1)
+      .setDepth(-1)
+      .setTint(0x00e5ff)
+      .setAlpha(0.65);
+
+    this.tweens.add({
+      targets: this.shadowDrone,
+      scaleX: 1.5,
+      scaleY: 1.5,
+      y: this.player.y + 26,
+      duration: 350,
+      ease: 'Back.easeOut'
+    });
+  }
+
+  triggerSmartBomb() {
+    this.cameras.main.flash(350, 255, 255, 255);
+    this.cameras.main.shake(300, 0.02);
+    this.sfx.explosionEnemy.play();
+    this.showPowerupBanner('*** SMART BOMB! ***');
+
+    // Wipe all incoming enemy bullets
+    this.enemyBullets.getChildren().forEach(function (b) { b.disableBody(true, true); });
+
+    // Destroy all active enemies
+    var active = this.enemies.getChildren().filter(function (e) { return e.active; });
+    active.forEach((e) => {
+      this.updateScore(e.kind.points);
+      this.explodeEnemy(e);
+    });
+  }
+
+  breakShield() {
+    this.hasShield = false;
+    if (this.shieldSprite) {
+      this.shieldSprite.destroy();
+      this.shieldSprite = null;
+    }
+    this.sfx.armorHit.play();
+    this.cameras.main.flash(180, 0, 220, 255);
+    this.showPowerupBanner('SHIELD BROKEN!');
+
+    // Temporary invulnerability frames
+    this.player.invulnerable = true;
+    this.tweens.add({
+      targets: this.player,
+      alpha: 0.25,
+      duration: 80,
+      yoyo: true,
+      repeat: 3,
+      onComplete: () => {
+        if (this.player && this.player.active) {
+          this.player.alpha = 1;
+          this.player.invulnerable = false;
+        }
+      }
+    });
+  }
+
+  showPowerupBanner(text) {
+    if (!this.powerupBanner) return;
+    this.powerupBanner.setText(text).setVisible(true).setAlpha(1);
+    this.tweens.killTweensOf(this.powerupBanner);
+    this.tweens.add({
+      targets: this.powerupBanner,
+      alpha: 0,
+      delay: 1400,
+      duration: 400,
+      onComplete: () => this.powerupBanner.setVisible(false)
+    });
+  }
+
+  updatePowerups(time, delta) {
+    // Falling animation for powerups
+    this.powerups.getChildren().forEach(function (p) {
+      if (p.active) {
+        p.x = p.baseX + Math.sin((time - p.spawnTime) * 0.005) * 16;
+        if (p.y > GAME_H + 30) p.destroy();
+      }
+    });
+
+    // Shadow drone trailing behind the player
+    var shadowActive = this.isPowerupActive('shadow') && this.player.active && this.player.body.enable;
+    if (shadowActive) {
+      if (!this.shadowDrone) {
+        this.spawnShadowDrone();
+      } else {
+        this.shadowDrone.x = Phaser.Math.Linear(this.shadowDrone.x, this.player.x, 0.35);
+        this.shadowDrone.y = Phaser.Math.Linear(this.shadowDrone.y, this.player.y + 26, 0.35);
+        this.shadowDrone.setVisible(this.player.visible);
+      }
+    } else if (this.shadowDrone) {
+      this.shadowDrone.destroy();
+      this.shadowDrone = null;
+    }
+
+    // Shield forcefield bubble
+    if (this.hasShield && this.player.active && this.player.body.enable) {
+      if (!this.shieldSprite) {
+        this.shieldSprite = this.add.sprite(this.player.x, this.player.y, 'shield-bubble')
+          .setDepth(1).setScale(1.2);
+      }
+      this.shieldSprite.setPosition(this.player.x, this.player.y);
+      this.shieldSprite.rotation += 0.03;
+      this.shieldSprite.setVisible(this.player.visible);
+    } else if (this.shieldSprite) {
+      this.shieldSprite.destroy();
+      this.shieldSprite = null;
+    }
+
+    // Update HUD indicator for active powerups
+    var hudParts = [];
+    if (this.hasShield) hudParts.push('SHIELD: [ON]');
+    if (this.isPowerupActive('shadow')) {
+      var sSec = Math.ceil((this.activePowerups.shadow - time) / 1000);
+      hudParts.push('SHADOW: ' + sSec + 's');
+    }
+    if (this.isPowerupActive('triple')) {
+      var tSec = Math.ceil((this.activePowerups.triple - time) / 1000);
+      hudParts.push('TRIPLE: ' + tSec + 's');
+    }
+    if (this.powerupHudText) {
+      this.powerupHudText.setText(hudParts.join('  '));
+    }
   }
 
   updateFormation(delta) {
@@ -472,13 +715,18 @@ class GameScene extends Phaser.Scene {
     });
     if (shooters.length === 0) return;
 
+    var shooter = weightedPick(shooters, (e) => e.kind.fireWeight);
+    var bulletKey = shooter.kind.bulletKey || 'enemy-bullet';
+    var bulletAnim = shooter.kind.bulletAnim || 'enemy-bullet-spin';
+    var bulletSpeed = shooter.kind.bulletSpeed || 170;
+
     var bullet = this.enemyBullets.get();
     if (!bullet) return;
 
-    var shooter = weightedPick(shooters, (e) => e.kind.fireWeight);
+    bullet.setTexture(bulletKey);
     bullet.enableBody(true, shooter.x, shooter.y + 18, true, true);
-    bullet.play('enemy-bullet-spin');
-    this.physics.moveToObject(bullet, this.player, Math.min(120 + (this.wave - 1) * 15, 260));
+    bullet.play(bulletAnim);
+    this.physics.moveToObject(bullet, this.player, Math.min(bulletSpeed + (this.wave - 1) * 12, 280));
     this.sfx.laserEnemy.play();
 
     var delay;
@@ -511,6 +759,7 @@ class GameScene extends Phaser.Scene {
     }
     // Shooting down a diver is worth double.
     this.updateScore(enemy.kind.points * (enemy.enemyState === ENEMY_FORMATION ? 1 : 2));
+    this.maybeSpawnPowerup(enemy.x, enemy.y);
     this.explodeEnemy(enemy);
   }
 
@@ -545,6 +794,10 @@ class GameScene extends Phaser.Scene {
 
   hitPlayer(player, bullet) {
     bullet.disableBody(true, true);
+    if (this.hasShield) {
+      this.breakShield();
+      return;
+    }
     this.damagePlayer();
   }
 
@@ -552,6 +805,10 @@ class GameScene extends Phaser.Scene {
   enemyCrash(player, enemy) {
     if (!this.canBeHit(player, enemy)) return;
     this.explodeEnemy(enemy);
+    if (this.hasShield) {
+      this.breakShield();
+      return;
+    }
     this.damagePlayer();
   }
 
@@ -561,8 +818,22 @@ class GameScene extends Phaser.Scene {
     this.sfx.explosionPlayer.play();
     this.cameras.main.shake(200, 0.01);
 
+    // Cancel active temporary powerups on death
+    this.hasShield = false;
+    if (this.shieldSprite) {
+      this.shieldSprite.destroy();
+      this.shieldSprite = null;
+    }
+    if (this.shadowDrone) {
+      this.shadowDrone.destroy();
+      this.shadowDrone = null;
+    }
+    this.activePowerups.shadow = 0;
+    this.activePowerups.triple = 0;
+
     player.body.enable = false;
-    player.play('player-explode');
+    var explodeAnim = (this.shipConfig ? this.shipConfig.spriteKey : 'player') + '-explode';
+    player.play(explodeAnim);
 
     this.lives--;
     var icon = this.lifeIcons[this.lives];
@@ -589,6 +860,21 @@ class GameScene extends Phaser.Scene {
     this.waveCleared = true;
     this.combatReadyAt = Infinity;
     this.clearBullets();
+
+    // Clear uncollected powerups floating in the play area
+    this.powerups.clear(true, true);
+
+    // Clear active temporary powerups (shadow, triple), preserving shield if active
+    this.activePowerups.shadow = 0;
+    this.activePowerups.triple = 0;
+    if (this.shadowDrone) {
+      this.shadowDrone.destroy();
+      this.shadowDrone = null;
+    }
+    if (this.powerupHudText) {
+      this.powerupHudText.setText(this.hasShield ? 'SHIELD: [ON]' : '');
+    }
+
     this.updateScore(200);
     this.wave++;
     this.player.setX(GAME_W / 2);
@@ -603,6 +889,7 @@ class GameScene extends Phaser.Scene {
   clearBullets() {
     this.bullets.getChildren().forEach(function (b) { b.disableBody(true, true); });
     this.enemyBullets.getChildren().forEach(function (b) { b.disableBody(true, true); });
+    this.powerups.getChildren().forEach(function (p) { p.destroy(); });
   }
 
   updateScore(points) {
@@ -615,7 +902,18 @@ class GameScene extends Phaser.Scene {
     this.gameOver = true;
     this.player.setVelocity(0, 0);
     this.player.body.enable = false;
-    this.player.play('player-explode');
+
+    if (this.shieldSprite) {
+      this.shieldSprite.destroy();
+      this.shieldSprite = null;
+    }
+    if (this.shadowDrone) {
+      this.shadowDrone.destroy();
+      this.shadowDrone = null;
+    }
+
+    var explodeAnim = (this.shipConfig ? this.shipConfig.spriteKey : 'player') + '-explode';
+    this.player.play(explodeAnim);
     Music.pause();
     this.time.delayedCall(900, () => {
       this.scene.start('gameover', { score: this.score, wave: this.wave });
