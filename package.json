@@ -1,0 +1,9 @@
+{
+  "name": "kondo-invaders",
+  "version": "3.0.0",
+  "description": "Kondo Invaders - retro shoot 'em up for mobile and desktop browsers.",
+  "private": true,
+  "scripts": {
+    "start": "npx --yes http-server . -c-1 -p 8080 -o"
+  }
+}
