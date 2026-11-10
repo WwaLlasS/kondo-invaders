@@ -4,6 +4,6 @@
   "description": "Kondo Invaders - retro shoot 'em up for mobile and desktop browsers.",
   "private": true,
   "scripts": {
-    "start": "npx --yes http-server . -c-1 -p 8080 -o"
+    "start": "npx --yes http-server . -c-1 -p 8083 -o"
   }
 }
