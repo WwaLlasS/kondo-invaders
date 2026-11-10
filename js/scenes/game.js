@@ -394,8 +394,14 @@ class GameScene extends Phaser.Scene {
     var activeCount = this.powerups.getChildren().filter(function (p) { return p.active; }).length;
     if (activeCount >= 3) return;
 
-    // Reduced drop rate (8.5% chance) so screen doesn't get cluttered
-    if (Math.random() > 0.085) return;
+    // Scaled drop rate: 8.5% base, 12% after wave 5, 18% after wave 10
+    var dropChance = 0.085;
+    if (this.wave > 10) {
+      dropChance = 0.18;
+    } else if (this.wave > 5) {
+      dropChance = 0.12;
+    }
+    if (Math.random() > dropChance) return;
 
     // Cooldown of 2.5s between drops to prevent simultaneous clusters
     if (this.time.now < (this.nextPowerupDropTime || 0)) return;
